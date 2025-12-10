@@ -3,7 +3,6 @@
 #include <time.h>
 
 
-int ID = 1; // Example ID
 char date[20]; // Buffer to hold date string
 
 int main() {
@@ -45,7 +44,7 @@ int main() {
 
     printf("Reading from COM3...\n");
 
-    fprintf(fpt,"ID;date;ammount\n");
+    fprintf(fpt,"timestamp;ammount\n");
     while (1) {
         if (ReadFile(hSerial, buffer, sizeof(buffer), &bytesRead, NULL)) {
             for (unsigned long i = 0; i < bytesRead; i++) {
@@ -55,15 +54,12 @@ int main() {
                     line[idx] = '\0';
 
 
-                    time_t currentTime; // get current time
-                    time(&currentTime); // get current time
-
-                    char *timeStr = ctime(&currentTime);
-                    timeStr[strcspn(timeStr, "\n")] = 0; // remove newline character
+                    char dateStr[20];    //test
+                    time_t now = time(NULL);    //test 
 
                     printf("message: %s\n", line);
-                    fprintf(fpt, "%d; %s; %s\n", ID, timeStr, line); //check if time works as intended 
-                    ID++;
+                    fprintf(fpt, "%lld;%s\n", (long long)now, line); //check if time works as intended 
+                    
 
                     idx = 0;
                 } else {
