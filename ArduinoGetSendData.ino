@@ -10,6 +10,7 @@ long duration;
 int dist1;
 int dist2;
 int distUsed;
+int volumeUsed;
 int n = 0;
 
 
@@ -53,9 +54,13 @@ void loop() {
     digitalWrite(PUMPE_PIN, LOW);
     dist2 = getDistance();
     
-    distUsed = dist2-dist1;        //find difference betveen distance before water been used, and after. can be used to find how much water in liters is used
+    distUsed = dist2-dist1;   //find difference betveen distance before water been used, and after. can be used to find how much water in liters is used
+  
 
-    Serial.println(distUsed);
+    volumeUsed = distUsed * 350;     //calculate volume used in liters
+
+
+    Serial.println(volumeUsed);  //print volume used to serial monitor
 
     n = 1;
   }else if(value>=500 && n == 0){
