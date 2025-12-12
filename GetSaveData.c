@@ -74,3 +74,8 @@ int main() {
     CloseHandle(hSerial);
     return 0;
 }
+
+
+// open png
+// write date + ammount of water used in terminal human readable
+

@@ -29,7 +29,7 @@ with open("MyFile.csv", "r") as df:
     reader = csv.DictReader(df, delimiter=';')
     for row in reader:
         date = int(row["timestamp"])
-        value = float(row["value"])
+        value = float(row["ammount"])
 
         if date >= start_ts and date < end_ts:
             day = datetime.datetime.fromtimestamp(date).strftime("%Y-%m-%d")

@@ -38,19 +38,19 @@ int getDistance() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  int value = analogRead(A5); 
+  int Input_ventil = analogRead(A5); //input from user to start pumpe
 
   distance = getDistance();
 
   //Serial.println(distance);     //print distance from sencor to water
 
 
-  if(value>=500 && n==1){         //function to start pumpe when used by user
+  if(Input_ventil>=500 && n==1){         //function to start pumpe when used by user
     digitalWrite(PUMPE_PIN, HIGH);
     dist1 = getDistance();
 
     n = 0;
-  }else if(value<=500 && n==0){
+  }else if(Input_ventil<=500 && n==0){
     digitalWrite(PUMPE_PIN, LOW);
     dist2 = getDistance();
     
@@ -59,13 +59,14 @@ void loop() {
 
     volumeUsed = distUsed * 350;     //calculate volume used in liters
 
+  Liters = volumeUsed / 1000;  //convert to liters
 
-    Serial.println(volumeUsed);  //print volume used to serial monitor
+    Serial.println(Liters); 
 
     n = 1;
-  }else if(value>=500 && n == 0){
+  }else if(Input_ventil>=500 && n == 0){
     digitalWrite(PUMPE_PIN, HIGH);
-  }else if(value<=500 && n == 1){
+  }else if(Input_ventil<=500 && n == 1){
     digitalWrite(PUMPE_PIN, LOW);
   }
 
