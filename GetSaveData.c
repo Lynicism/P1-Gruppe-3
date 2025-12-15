@@ -8,8 +8,9 @@ char date[20]; // Buffer to hold date string
 int main() {
 
     FILE *fpt;    //file pointer variable
-    fpt = fopen("MyFile.csv", "w+");   //open file in write mode
-
+    fpt = fopen("MyFile.csv", "a+");   //open file in append mode
+    fseek(fpt, 0, SEEK_END);
+    long size = ftell(fpt);
 
     HANDLE hSerial;
     unsigned long bytesRead;
@@ -44,7 +45,9 @@ int main() {
 
     printf("Reading from COM3...\n");
 
+    if (size == 0){
     fprintf(fpt,"timestamp;ammount\n");
+    }
     while (1) {
         if (ReadFile(hSerial, buffer, sizeof(buffer), &bytesRead, NULL)) {
             for (unsigned long i = 0; i < bytesRead; i++) {
@@ -54,8 +57,8 @@ int main() {
                     line[idx] = '\0';
 
 
-                    char dateStr[20];    //test
-                    time_t now = time(NULL);    //test 
+                    char dateStr[20];    
+                    time_t now = time(NULL);    
 
                     printf("message: %s\n", line);
                     fprintf(fpt, "%lld;%s\n", (long long)now, line); //check if time works as intended 
@@ -76,6 +79,6 @@ int main() {
 }
 
 
-// open png
-// write date + ammount of water used in terminal human readable
+// open png?
+// write date + ammount of water used in terminal human readable?
 
