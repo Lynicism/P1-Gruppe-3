@@ -1,8 +1,8 @@
 #define TRIG_PIN 8
 #define ECHO_PIN 9
-#define PUMPE_PIN 3 //2 eller 3
+#define PUMPE_PIN 3 
 #define VENTIL_PIN 2 
-#define Bruger_IN A0
+#define Bruger_IN 13
 
 int distance;
 long duration;
@@ -21,7 +21,7 @@ void setup() {
    pinMode(ECHO_PIN, INPUT);
    pinMode(PUMPE_PIN, OUTPUT);
    pinMode(VENTIL_PIN, OUTPUT);
-   pinMode(Bruger_IN, INPUT_PULLUP); //INPUT_PULLUP
+   pinMode(Bruger_IN, INPUT); 
 }
 
 
@@ -40,11 +40,11 @@ int getDistance() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  int Input_ventil = analogRead(A0); //input from user to start pumpe
+
 
   distance = getDistance();
 
-  bool buttonPressed = Input_ventil >= 1020;
+  bool buttonPressed = digitalRead(Bruger_IN); //read button state
 
   //Serial.println(distance);     //print distance from sencor to water
 
