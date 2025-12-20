@@ -1,0 +1,18 @@
+###################################
+# Syntax Coloring Map For Alash_HC_SR04
+###################################
+
+###################################
+# Datatypes (KEYWORD1)
+###################################
+
+
+# Class
+AlashUltrasonic	KEYWORD1
+
+###################################
+# Methods and Functions (KEYWORD2)
+###################################
+
+begin	KEYWORD2
+getDistance	KEYWORD2
