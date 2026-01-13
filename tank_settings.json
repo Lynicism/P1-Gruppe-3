@@ -1,0 +1,64 @@
+{
+    "index": {
+        "currentTank": "8",
+        "previousTank": "0"
+    },
+    "slot1": {
+        "tankId": "5",
+        "nameCsv": "data_tank5.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "16", "length": "25", "height": "15"},
+        "volume": {"maxCcm": "6000", "maxLiters": "6"}
+    },
+    "slot2": {
+        "tankId": "8",
+        "nameCsv": "data_tank8.csv",
+        "tankType": {"1": "cylindrical"},
+        "cylindrical": {"diameter": "40", "height": "20"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "25132", "maxLiters": "25"}
+    },
+    "slot3": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    },
+    "slot4": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    },
+    "slot5": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    },
+    "slot6": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    },
+    "slot7": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    },
+    "slot8": {
+        "tankId": "0",
+        "nameCsv": "data_tank0.csv",
+        "tankType": {"0": "rectangular"},
+        "cylindrical": {"diameter": "0", "height": "0"},
+        "rectangular": {"width": "0", "length": "0", "height": "0"},
+        "volume": {"maxCcm": "0", "maxLiters": "0"}    }
+}

@@ -1,0 +1,19 @@
+{
+    "daily": {
+        "start_date": "2025-12-22",
+        "end_date": "2025-12-22"
+    },
+    "weekly": {
+        "start_date": "2025-12-22",
+        "end_date": "2025-12-22"
+    },
+    "yearly": {
+        "start_date": "2025-12-22",
+        "end_date": "2025-12-22"
+    },
+    "custom": {
+        "start_date": "2025-12-22",
+        "end_date": "2025-12-22"
+    },
+    "selected_graph_type": "daily"
+}
