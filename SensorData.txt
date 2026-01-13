@@ -1,0 +1,126 @@
+#include <AlashUltrasonic.h>
+
+//pvb gnd pin "N"
+//pcb vcc pin "O"
+// relay blue pcb pin "T", arduino pin "2"
+#define VENTIL_PIN 2 
+// relay black pcb pin "U", arduino pin "3"
+#define PUMPE_PIN 3 
+// pcb pin "S", arduino pin "8"
+#define TRIGGER_PIN 8
+// pcb pin "R", arduino pin "9"
+#define ECHO_PIN 9
+// pcb pin "Q", arduino pin "13"
+#define Bruger_IN 13
+
+AlashUltrasonic sensorGPIO(TRIGGER_PIN, ECHO_PIN);
+
+//distance measurement via ultrasonic sensor
+int distance;
+
+//first compelled distance measurement
+int Cdist1;
+//second compelled distance measurement
+int Cdist2;
+
+//first Periodical distance measurement
+int Pdist1;
+//second Periodical distance measurement
+int Pdist2;
+
+//difference Compelled dist2-dist1
+int CdistUsed;
+
+//difference Periodical dist2-dist1
+int PdistUsed;
+
+
+//Volume change in liters (Compelled measurement)
+int CvolumeUsed;
+
+//Volume change in liters (Periodical measurement)
+int PvolumeUsed;
+
+//flag indicating the current state of the manual input (Bruger_IN)
+// 1 = button is pressed, 0 = button is released
+int buttonSavedState = 0; 
+
+//counter integer for periodical measurement
+int counter = 0;
+
+void setup() {
+   Serial.begin(9600);
+   
+   
+   sensorGPIO.begin();
+
+   pinMode(TRIGGER_PIN, OUTPUT);
+   pinMode(ECHO_PIN, INPUT);
+   pinMode(PUMPE_PIN, OUTPUT);
+   pinMode(VENTIL_PIN, OUTPUT);
+   pinMode(Bruger_IN, INPUT);
+}
+
+
+void loop() {
+  Pdist1 = Pdist2;
+
+  int Input_ventil = digitalRead(13); 
+  bool buttonPressed = Input_ventil == HIGH;
+  int distance = sensorGPIO.getDistance();  
+
+//on button press, the pump relays switches on
+
+  if(buttonPressed) {
+    if (buttonSavedState == 0){
+      Cdist1 = distance;
+      buttonSavedState = 1;
+    }
+    digitalWrite(PUMPE_PIN, HIGH);
+  }
+  else {
+
+// On button release, the compelled data reading is sent through COM connection
+
+    if (buttonSavedState == 1){
+      Cdist2 = distance;
+      CdistUsed = Cdist2 - Cdist1;
+      CvolumeUsed = CdistUsed * 350;
+      int dV = ((-1) * (CvolumeUsed / 1000)); //integer is reversed, since distance from water level to sensor means 
+      Serial.print("C;");                     //that the water level has increased, and vice versa.
+      Serial.println(dV);
+      buttonSavedState = 0;
+    }
+    digitalWrite(PUMPE_PIN, LOW);
+  }
+
+  //Valve relay opens when distance from sensor to water surface is less than 7 cm.
+  //in practice, this constant needs to be modifiable as to not have the tank system
+  //depend on precicely this sensor distance to provide accurate data.
+  if(distance <= 7){
+    digitalWrite(VENTIL_PIN, HIGH);
+  }
+  else{
+    digitalWrite(VENTIL_PIN, LOW);
+  }
+
+  //Send dVperiodical. repeats ~every 30 seconds. 
+  //Prefix P and prefix C acting as a sign bit for 
+  //Periodical and Compelled data packets, 
+  //respectively. The serial communication code in C program
+  //interprets on these, and writes the data following sign character
+  //to separate columns in a .CSV file in accordance
+
+  counter++;
+  if(counter >= 150){
+    Pdist2 = distance;
+    PdistUsed = Pdist2 - Pdist1;
+    PvolumeUsed = PdistUsed * 350;
+    int dV = ((-1) * (PvolumeUsed / 1000));
+    Serial.print("P;");
+    Serial.println(dV);
+    counter = 0;
+  }
+
+  delay(100);
+}
