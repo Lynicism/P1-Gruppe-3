@@ -97,6 +97,7 @@ void loop() {
   //Valve relay opens when distance from sensor to water surface is less than 7 cm.
   //in practice, this constant needs to be modifiable as to not have the tank system
   //depend on precicely this sensor distance to provide accurate data.
+  
   if(distance <= 7){
     digitalWrite(VENTIL_PIN, HIGH);
   }

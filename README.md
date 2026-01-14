@@ -7,9 +7,10 @@ Programmet er i stand til at monitorere vandstanden i 8 forskellige vandtanke.
 Programmet kan udskrive grafer over vandstanden over tid vha. live data modtaget fra en ultralydssensor tilsluttet en arduino.
 Programmet styres igennem terminalmenu
 
+OBS: Python og Pythons "matplotlib" skal være installeret for at programmet fungerer korrekt. Yderligere er det måske påkrævet at genkompilere programmet via MinGW lokalt
 
 
-VScode co-pilot ai assistant er flittigt brugt i udvikling af programmet
+VScode co-pilot ai assistant er brugt i udvikling af programmet
 
 
 

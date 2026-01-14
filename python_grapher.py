@@ -97,7 +97,7 @@ def calculate_tank_volume(tankCsv, tank_config):
                 sys.exit(1)
             
             # Add missing columns to fieldnames
-            new_columns = ["Serial/Calculated", "dVsum", "date", "volume"]
+            new_columns = ["Serial/Compelled", "dVsum", "date", "volume"]
             for col in new_columns:
                 if col not in fieldnames:
                     fieldnames.append(col)
