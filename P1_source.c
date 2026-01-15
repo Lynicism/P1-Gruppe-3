@@ -67,6 +67,13 @@ int tankNumber = -1;
 //Index for hvilke tanke programmet har adgang til at tilgå. bruges til at give hver tank en 'plads'
 int tankIndex[8] = {0,0,0,0,0,0,0,0}; 
 
+//char array som bruges til at indikere den valgte graftype
+char graphType[256];
+
+//integer værdi som oplyser om serieport er tilsluttet: 
+//-1 = ikke oplyst (programmet er netop initialiseret) 0 = ikke tilsluttet 1 = tilsluttet
+int comConnection = -1;
+
 
 
 //======================================== File Dependency Functions ========================================================//
@@ -181,7 +188,7 @@ void write_yearly_config(void) {
 }
 
 
-//======================================== Write Graph Functions ========================================================//
+//======================================== Tank Setup Functions ========================================================//
 
 // Funktionen begynder opsætningen af en ny tank
 void tank_setup(void) { 
@@ -331,6 +338,15 @@ void tank_setup(void) {
         printf("\nInvalid choice. Try again.\n\n");
         return tank_setup();
     }
+//Kør append_csv hvis nuværende tank findes
+
+    if (tankNumber != 0) {
+        printf("Updating csv file\n");
+        system("python append_csv.py");
+        if (system("python append_csv.py") != 0) {
+            fprintf(stderr, "\nError: Failed to run append_csv.py\n\n");
+        }
+    }
 }
 
 //funktionen lagrer information om tanken i "tank_settings.json" når en ny tank tilføjes
@@ -438,6 +454,7 @@ void write_tank_dimensions(int tank_type, int length, int width, int height, int
 
 //funktionen aflæser den tilsluttede tanks oplysninger fra tank_settings.json og printer dem i konsollen
 void read_tank_settings(void) {
+
     FILE *fp = fopen("tank_settings.json", "r");
 
 //hvis filen ikke kan åbnes, nulstilles kaldes reset_tank_settings funktionen
@@ -485,9 +502,65 @@ void read_tank_settings(void) {
     
     fclose(fp);
     printf("\nTank settings loaded successfully.\n\n");
+
+
 }
 
+//funktion som tillader brugeren at skifte nuværende tank
+void switchTank(void) {
 
+//forbered hukkommelse til brugerinput
+    int switchId = 0;
+    printf("Select tank to switch to (available tanks): ");
+//hvis brugerinput er ugyldigt eller tanken ikke er konfigureret, returneres funktionen
+    if (scanf("%d", &switchId) != 1 || switchId < 1 || switchId > 8) {
+        printf("Invalid Tank ID. Try again.\n");
+        empty_stdin();
+        return;
+    }
+    else if (tankIndex[switchId - 1] == 0) {
+        printf("Tank ID %d is not configured. Please set up the tank first.\n", switchId);
+        empty_stdin();
+        return;
+    }
+//global variabel tankNumber opdateres med brugervalgt tankId
+    else {
+    tankNumber = switchId;
+    empty_stdin();
+    }
+
+    FILE *fp = fopen("tank_settings.json", "r+");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: Cannot open tank_settings.json\n");
+        return;
+    }
+
+    char line[512];
+    FILE *tmp = fopen("tank_settings.json.tmp", "w");
+    if (tmp == NULL) {
+        fprintf(stderr, "Error: Cannot create temporary file\n");
+        fclose(fp);
+        return;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, "\"currentTank\"")) {
+            fprintf(tmp, "        \"currentTank\": \"%d\",\n", tankNumber);
+        } else {
+            fprintf(tmp, "%s", line);
+        }
+    }
+
+    fclose(fp);
+    fclose(tmp);
+
+    remove("tank_settings.json");
+    rename("tank_settings.json.tmp", "tank_settings.json");
+
+    printf("Tank switched successfully.\n\n");
+    printf("Updating csv file\n");
+    printf("\n\nCurrent tank is now tankID %d\n\n", tankNumber);
+}
 
 //======================================== Menu Display Functions ========================================================//
 
@@ -524,7 +597,8 @@ void tank_settings(void) {
     printf("1. Tank setup\n");
     printf("2. Manual purge\n");
     printf("3. View tank index\n");
-    printf("4. Return to main menu\n");
+    printf("4. Reset tank settings\n");
+    printf("5. Return to main menu\n");
     printf("=====================\n\n");
 }
 
@@ -539,57 +613,97 @@ FILE *fp = fopen(tankCsv, "r");
         fprintf(stderr, "Error: Cannot open %s for reading\n", tankCsv);
         return;
     }
-//forbered hukommelse 
-    char line[256];
-//variabler til beregning af sum, gennemsnit, første og sidste værdi, antal målinger samt tidsstempler
-    double sum = 0;
-    double first_value = 0;
-    double last_value = 0;
+//forbered hukommelse til linjer
+    char line[512], line_copy[512];
+    
+//variabler til beregning af volumen sum, dVsum sum, nuværende volumen, maksimal volumen, antal rækker samt tidsstempler
+    double volumeSum = 0, dVsum = 0, currentVolume = 0, maxVolume = 0;
     int count = 0;
-    time_t first_timestamp = 0;
-    time_t last_timestamp = 0;
+    time_t first_timestamp = 0, last_timestamp = 0;
 
-
+//skip header linje
     fgets(line, sizeof(line), fp);
 
 //gennemgå hver linje i .csv filen
     while (fgets(line, sizeof(line), fp)) {
-//split linjen ved semikolon og hent tidsstempel og værdi
-        char *token = strtok(line, ";");
-        if (token == NULL) continue;
-
-        time_t timestamp = (time_t)atoll(token);
-        token = strtok(NULL, ";");
-        if (token == NULL) continue;
-
-//konverter værdien til double
-        double value = atof(token);
-
-//hvis det er den første værdi, gemmes den som first_value og first_timestamp
-        if (count == 0) {
-            first_value = value;
-            first_timestamp = timestamp;
+        // Trim newline if present
+        line[strcspn(line, "\n")] = 0;
+        
+//kopier linjen så strtok ikke ødelægger originalen
+        strcpy(line_copy, line);
+        
+//split linjen ved semikolon for at få alle kolonner
+        char *token;
+        int col = 0;
+        double dVsum_value = 0;
+        
+        token = strtok(line_copy, ";");
+        
+        while (token != NULL) {
+            // Trim whitespace from token
+            while (*token == ' ') token++;
+            char *end = token + strlen(token) - 1;
+            while (end > token && *end == ' ') end--;
+            *(end + 1) = '\0';
+            
+            switch (col) {
+                case 0: // timestamp
+                    if (strlen(token) > 0) {
+                        time_t ts = (time_t)atoll(token);
+                        if (ts > 0) {
+                            if (count == 0) first_timestamp = ts;
+                            last_timestamp = ts;
+                        }
+                    }
+                    break;
+                case 1: // dVperiodical
+                    if (strlen(token) > 0) {
+                        dVsum_value += atof(token);
+                    }
+                    break;
+                case 2: // dVcompelled
+                    if (strlen(token) > 0) {
+                        dVsum_value += atof(token);
+                    }
+                    break;
+                case 6: // currentVolume (if available from Python processing)
+                    if (strlen(token) > 0) {
+                        currentVolume = atof(token);
+                        volumeSum += currentVolume;
+                    }
+                    break;
+                case 7: // maxVolume (if available from Python processing)
+                    if (strlen(token) > 0) {
+                        maxVolume = atof(token);
+                    }
+                    break;
+            }
+            token = strtok(NULL, ";");
+            col++;
         }
-        last_value = value;
-        last_timestamp = timestamp;
-        sum += value;
+        
+        dVsum += dVsum_value;
         count++;
     }
 
     fclose(fp);
+
 //beregn og print statistik i konsollen
-    if (count > 0) {
-        double average = sum / count;
-        double rate_of_change = 0;
-        if (count > 1) {
-            rate_of_change = (last_value - first_value) / (difftime(last_timestamp, first_timestamp) + 1);
+    if (count > 1) {
+        double averageVolume = (volumeSum > 0) ? volumeSum / count : 0;
+        double timeDiff = difftime(last_timestamp, first_timestamp);
+        double average_hourly_rate = 0;
+        
+        if (timeDiff > 0) {
+            average_hourly_rate = (dVsum / timeDiff) * 3600;
         }
 
         printf("\n===== Current Tank Metrics =====\n");
-        printf("Total data entries: %d\n", count);
-        printf("Average tank volume: %.2f L\n", average);
-        printf("Average rate of change: %.4f L/hour\n", (rate_of_change*3600)); // per hour
-        printf("Latest measurement: %.2f L (%s)\n", last_value, ctime(&last_timestamp));     
+        printf("Total data entries: %d\n", count - 1);
+        printf("Average tank contents: %.2f L\n", averageVolume);
+        printf("Average rate of change: %.4f L/hour\n", average_hourly_rate);
+        printf("Current volume: %.2f L\n", currentVolume);
+        printf("Max volume: %.2f L\n", maxVolume);
         printf("================================\n\n");
     } else {
         printf("No data found in CSV file.\n\n");
@@ -658,18 +772,19 @@ void empty_stdin (void){
 
 //funktionen åbner grafbilledet som python programmet generer
 void open_graph_image(const char *graph_type) {
+
+//forbered hukommelse til filsti
     char imagePath[256];
+
+//forbered filsti til grafbilledet i forhold til nuværende tanknummer og graftype
+    snprintf(imagePath, sizeof(imagePath), "%s_tank%d.png", graphType, tankNumber);
     
-    // Match Python naming: {graph_type}_tank{tankNumber}.png
-    snprintf(imagePath, sizeof(imagePath), "%s_tank%d.png", graph_type, tankNumber);
-    
-    // Check if file exists
+//tjek om filen eksisterer
     FILE *check = fopen(imagePath, "r");
     if (check) {
         fclose(check);
     } else {
-        printf("Error: Graph file '%s' not found.\n", imagePath);
-        printf("Please run the Python grapher first.\n\n");
+        printf("Error: Graph file '%s' not found.\n\n", imagePath);
         return;
     }
     
@@ -717,6 +832,7 @@ int main() {
         read_tank_settings();
     }
 
+
 //definitioner for serial kommunikation
     #define BUFFER_SIZE 256
     #define LINE_SIZE 256
@@ -748,13 +864,12 @@ int main() {
     char serialline[LINE_SIZE];
     int idx = 0;
 
-//integer værdi som oplyser om serieport er tilsluttet: 
-//-1 = ikke oplyst (programmet er netop initialiseret) 0 = ikke tilsluttet 1 = tilsluttet
-int comConnection = -1;
+
 //Serial kommunikations variabel så brugeres manuelt kan angive hvilken COM port der skal forbindes til
     int ComPortInput = -1;
     char portName[32];
-    
+
+
 //brugeren bedes indtaste COM port nummeret
     while(1){
         printf("Enter the number of the connected COM port:\n");
@@ -812,17 +927,19 @@ int comConnection = -1;
         fclose(fpt);
         comConnection = 0;
     }
+    else {
+        comConnection = 1;
+    }
     
-
-//Successful connection report
-    if (comConnection = 0){
+//hvis comConnection flaget er 0, sendes en advarsel til konsollen
+    if (comConnection == 0){
         printf("\n\n!WARNING! No serial communication link established. Some functions may be unavailable\n\nLoading main menu\n");
     }
-    else{
+//hvis comConnection flaget er 1, sendes en bekræftelse til konsollen
+    else if(comConnection == 1){
         printf("Connection established on port %s\n", portName);
         comConnection = 1;
     }
-
 
 //hovedmenu loop
 
@@ -846,7 +963,7 @@ int comConnection = -1;
 //menuvalg 1: start serial input læsning
         if (choice == 1) {
 //hvis der ikke er oprettet forbindelse til serieporten, sendes en fejlmeddelelse til konsollen
-            if (comConnection = 1){
+            if (comConnection == 0){
                 printf("Function unavailable: no serial communication link.\n Returning to main menu\n\n");
             }
             else{
@@ -872,9 +989,13 @@ int comConnection = -1;
                         if (_getch() == 'q') {
                             readyFlag = 0;
                             printf("==== Data Recording halted ====\n\n");
-                            printf("Returning to main menu...\n\n");
+                            printf("Updating csv and returning to main menu...\n\n");
+                            system("python append_csv.py");
+                            if (system("python append_csv.py") != 0) {
+                                fprintf(stderr, "\nError: Failed to run append_csv.py\n\n");        
                             display_menu();
                             break;
+                            }
                         }
                     }
 //data fra serial buffer behandles tegn for tegn
@@ -939,6 +1060,7 @@ int comConnection = -1;
 
 //menuvalg 2: analyser den nuværende tanks .csv fil via analyze_csv funktionen
         } else if (choice == 2) {
+//kald python scriptet append_csv.py for at sikre at .csv filen er opdateret
             analyze_csv(tankCsv);
 
 //menuvalg 3: graf menu
@@ -956,35 +1078,39 @@ int comConnection = -1;
 //grafmenu valg 1: daglig graf
             if (graphChoice == 1) {
 //kald funktionen write_daily_config. se funktionens definition for beskrivelse
+                strcpy(graphType, "daily");
                 write_daily_config();
                 printf("\nDaily graph config saved.\n");
                 printf("Generating graph...\n");
 //kald python scriptet python_grapher.py
                 system("python python_grapher.py"); 
 //åbn det genererede grafbillede
-                open_graph_image("daily");  
+                open_graph_image(graphType);  
 
 //grafmenu valg 2: ugentlig graf
             } else if (graphChoice == 2) {
 //kald funktionen write_weekly_config. se funktionens definition for beskrivelse
                 write_weekly_config();
+                strcpy(graphType, "weekly");                
                 printf("\nWeekly graph config saved.\n");
                 printf("Generating graph...\n");
                 system("python python_grapher.py");
-                open_graph_image("weekly");
+                open_graph_image(graphType);
 
 //grafmenu valg 3: årlig graf
             } else if (graphChoice == 3) {
 //kald funktionen write_yearly_config. se funktionens definition for beskrivelse
                 write_yearly_config();
+                strcpy(graphType, "yearly");
                 printf("\nYearly graph config saved.\n");
                 printf("Generating graph...\n");
                 system("python python_grapher.py");
-                open_graph_image("yearly");
+                open_graph_image(graphType);
 
 //grafmenu valg 4: brugerdefineret periode  
 //brugeren bedes indtaste start- og slutdato for perioden de ønsker at analysere              
             } else if (graphChoice == 4) {
+                strcpy(graphType, "custom");
                 char start_date[20], end_date[20];
                 printf("\n\nEnter period start date (YYYY-MM-DD): ");
                 scanf("%19s", start_date);
@@ -996,7 +1122,7 @@ int comConnection = -1;
                 printf("\nCustom graph config saved.\n");
                 printf("Generating graph...\n");
                 system("python python_grapher.py");
-                open_graph_image("custom");
+                open_graph_image(graphType);
             }
             else {
                 printf("Invalid input. Try again.\n");
@@ -1030,82 +1156,33 @@ int comConnection = -1;
 //tankindstillinger menu valg 3: vis tankindeks
             else if (tankChoice == 3) {
                 printf("\n\n=== Tank Index ===\n");
-                
-//åbn tank_settings.json i læsetilstand
-                FILE *settings_fp = fopen("tank_settings.json", "r");
-                if (settings_fp == NULL) {
-                    fprintf(stderr, "\nError: Cannot open tank_settings.json\n\nReturning to main menu...\n\n");
-                } else {
-                    char line[512];
-//tank_settings.json gennemgås og printer tankArrayets indhold i konsollen
-                    printf("\nSlot Configuration:\n");
-                    for (int slot = 1; slot <= 8; slot++) {
-                        if (tankIndex[slot-1] == 0) {
-                            printf("Slot %d: Available\n", slot);
-                        } else {
-                            printf("Slot %d: TankID %d\n", slot, tankIndex[slot-1]);
-                        }
+//print forbundede tanke jf. tankIndex i konsollen
+                printf("\nSlot Configuration:\n");
+
+                for (int slot = 1; slot <= 8; slot++) {
+                    if (tankIndex[slot-1] == 0) {
+                        printf("Slot %d: Available\n", slot);
                     }
-                    
-                    printf("\nTank Dimensions:\n");
-                    
-                    int current_tank = -1;
-                    double diameter = 0, height = 0, width = 0, length = 0;
-                    
-                    while (fgets(line, sizeof(line), settings_fp)) {
-//tilføjer kommentar i morgen 14/01/2026 
-                        if (sscanf(line, "    \"slot%d\":", &current_tank) == 1) {
-                            // Check if this slot has a tank assigned
-                            if (tankIndex[current_tank-1] != 0) {
-                                printf("\nSlot %d (TankID %d):\n", current_tank, tankIndex[current_tank-1]);
-                            }
-                        }
-                        
-                        // Parse dimensions
-                        sscanf(line, "            \"diameter\": \"%lf\"", &diameter);
-                        sscanf(line, "            \"height\": \"%lf\"", &height);
-                        sscanf(line, "            \"width\": \"%lf\"", &width);
-                        sscanf(line, "            \"length\": \"%lf\"", &length);
-                        
-                        // Print tank info when we hit the end of a tank section
-                        if (current_tank > 0 && strstr(line, "    }") && !strchr(line, '{')) {
-                            if (tankIndex[current_tank-1] != 0) {
-                                // Determine tank type and calculate max volume
-                                if (diameter > 0 && height > 0) {
-                                    // Cylindrical tank
-                                    double radius = diameter / 2;
-                                    double max_volume = 3.14159 * radius * radius * height;
-                                    printf("  Type: Cylindrical\n");
-                                    printf("  Diameter: %.1f cm\n", diameter);
-                                    printf("  Height: %.1f cm\n", height);
-                                    printf("  Max Volume: %.2f cm³ (%.2f L)\n", max_volume, max_volume / 1000);
-                                } else if (length > 0 && width > 0 && height > 0) {
-                                    // Rectangular tank
-                                    double max_volume = length * width * height;
-                                    printf("  Type: Rectangular\n");
-                                    printf("  Length: %.1f cm\n", length);
-                                    printf("  Width: %.1f cm\n", width);
-                                    printf("  Height: %.1f cm\n", height);
-                                    printf("  Max Volume: %.2f cm³ (%.2f L)\n", max_volume, max_volume / 1000);
-                                }
-                            }
-                            // Reset for next tank
-                            diameter = 0;
-                            height = 0;
-                            width = 0;
-                            length = 0;
-                            current_tank = -1;
-                        }
+                    else{
+                        printf("Slot %d: TankID %d\n", slot, tankIndex[slot-1]);
                     }
-                    
-                    fclose(settings_fp);
                 }
-                
-                printf("\n==================\n\n");
-            }
-//tankindstillinger menu valg 4: returner til hovedmenu
+                printf("\n==================\n");
+                printf("Do you want to switch current tank? (Y/N)\n\n");
+                char switchConfirm = getchar();
+                if (switchConfirm == 'Y' || switchConfirm == 'y') {
+                    switchTank();
+                } else {
+                    printf("\nReturning to main menu\n\n");
+                }
+           }
+//tankindstillinger menu valg 4: nulstil tankindstillinger via reset_tank_settings funktionen
             else if (tankChoice == 4) {
-                printf("\nReturning to main menu...\n\n");
+                reset_tank_settings();
+            }
+//tankindstillinger menu valg 5: returner til hovedmenu
+            else if (tankChoice == 5) {
+                printf("\nReturning to main menu\n\n");
                 display_menu();
             } 
 //ugyldigt tankindstillinger menu valg
@@ -1117,8 +1194,14 @@ int comConnection = -1;
         } else if (choice == 5) {
             CloseHandle(hSerial);
             fclose(fpt);
-            printf("Exiting...\n");
-            return 1;
+            printf("Exiting\n");
+            printf("Are you sure? (Y/N)\n");
+            char exitConfirm = getchar();
+            if (exitConfirm == 'Y' || exitConfirm == 'y') {
+                return 1;
+            } else {
+                printf("\nExit cancelled\n\n");
+            }
 //hvis hovedmenu valg er ugyldigt, genstartes hovedmenuen
         } else {
             printf("Invalid choice. Try again.\n");

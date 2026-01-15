@@ -1,19 +1,19 @@
 {
     "daily": {
-        "start_date": "2025-01-13",
-        "end_date": "2025-01-13"
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-15"
     },
     "weekly": {
-        "start_date": "2025-01-13",
-        "end_date": "2025-01-13"
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-15"
     },
     "yearly": {
-        "start_date": "2025-01-13",
-        "end_date": "2025-01-13"
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-15"
     },
     "custom": {
-        "start_date": "2025-01-13",
-        "end_date": "2025-01-13"
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-15"
     },
-    "selected_graph_type": "yearly"
+    "selected_graph_type": "daily"
 }

@@ -5,6 +5,7 @@ import csv
 import json
 import matplotlib.pyplot as plt
 import sys
+import subprocess
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -29,8 +30,11 @@ dEn = datetime.datetime.strptime(dateEnd, "%Y-%m-%d")
 dSt = dSt.replace(hour=0, minute=0, second=0, microsecond=0)
 dEn = dEn.replace(hour=0, minute=0, second=0, microsecond=0)
 
-start_ts = time.mktime(dSt.timetuple())
-end_ts = time.mktime(dEn.timetuple()) + 86400  # + one day in seconds
+start_ts = int(time.mktime(dSt.timetuple()))
+end_ts = int(time.mktime(dEn.timetuple())) + 86400  # + one day in seconds
+
+print(f"Debug: Date range {dateStart} to {dateEnd}")
+print(f"Debug: Timestamp range {start_ts} to {end_ts}")
 
 # Get current tank - handle both string and int formats
 currentTank = str(settings.get("index", {}).get("currentTank", "0"))
@@ -62,92 +66,6 @@ if not tankCsv or tankCsv.strip().lower() == "data_tank0.csv":
     sys.exit(1)
 
 
-def calculate_tank_volume(tankCsv, tank_config):
-    """Calculate tank volume, dVsum, and date; add missing columns to CSV"""
-    tank_type = tank_config.get("tankType", {})
-    
-    # Determine if cylindrical (key "1") or rectangular (key "0")
-    is_cylindrical = "1" in tank_type and tank_type["1"] == "cylindrical"
-    
-    if is_cylindrical:
-        diameter = float(tank_config.get("cylindrical", {}).get("diameter", 0))
-        height = float(tank_config.get("cylindrical", {}).get("height", 0))
-        max_volume = 3.14159 * (diameter / 2) ** 2 * height
-    else:
-        width = float(tank_config.get("rectangular", {}).get("width", 0))
-        length = float(tank_config.get("rectangular", {}).get("length", 0))
-        height = float(tank_config.get("rectangular", {}).get("height", 0))
-        max_volume = width * length * height
-    
-    if max_volume <= 0:
-        print("Error: Invalid tank dimensions (volume <= 0)")
-        sys.exit(1)
-    
-    rows = []
-    current_volume = max_volume
-    fieldnames = []
-    
-    try:
-        with open(tankCsv, "r") as df:
-            reader = csv.DictReader(df, delimiter=';')
-            fieldnames = list(reader.fieldnames) if reader.fieldnames else []
-            
-            if not fieldnames:
-                print(f"Error: {tankCsv} has no headers or is empty")
-                sys.exit(1)
-            
-            # Add missing columns to fieldnames
-            new_columns = ["Serial/Compelled", "dVsum", "date", "volume"]
-            for col in new_columns:
-                if col not in fieldnames:
-                    fieldnames.append(col)
-            
-            for row in reader:
-                try:
-                    # Get timestamp and convert to date
-                    timestamp = int(row.get("timestamp", "0").strip()) if row.get("timestamp", "").strip() else 0
-                    if timestamp > 0:
-                        date_obj = datetime.datetime.fromtimestamp(timestamp)
-                        row["date"] = date_obj.strftime("%Y-%m-%d")
-                    else:
-                        row["date"] = ""
-                    
-                    # Calculate dVsum (sum of periodical and compelled)
-                    dVperiodical = float(row.get("dVperiodical", "0").strip()) if row.get("dVperiodical", "").strip() else 0
-                    dVcompelled = float(row.get("dVcompelled", "0").strip()) if row.get("dVcompelled", "").strip() else 0
-                    
-                    dVsum = dVperiodical + dVcompelled
-                    row["dVsum"] = f"{dVsum:.2f}"
-                    
-                    # Calculate current volume
-                    current_volume -= dVsum
-                    current_volume = max(0, current_volume)
-                    row["volume"] = f"{current_volume:.2f}"
-                    row["Serial/Calculated"] = "*"
-                
-                    
-                    rows.append(row)
-                except (ValueError, AttributeError) as e:
-                    print(f"Warning: Skipping malformed row")
-                    continue
-        
-        if not rows:
-            print(f"Error: No valid data in {tankCsv}")
-            sys.exit(1)
-        
-        # Write with all fieldnames including new columns
-        with open(tankCsv, "w", newline='') as df:
-            writer = csv.DictWriter(df, fieldnames=fieldnames, delimiter=';')
-            writer.writeheader()
-            writer.writerows(rows)
-        
-        print(f"Processing: {tankCsv} ({len(rows)} rows)")
-        
-    except IOError as e:
-        print(f"Error reading/writing file: {e}")
-        sys.exit(1)
-
-
 def aggregate_data(tankCsv, start_ts, end_ts, graph_type):
     """Aggregate data based on graph type"""
     aggregated = {}
@@ -158,12 +76,15 @@ def aggregate_data(tankCsv, start_ts, end_ts, graph_type):
             reader = csv.DictReader(df, delimiter=';')
             for row in reader:
                 try:
-                    timestamp = int(row["timestamp"].strip())
+                    # Strip keys from row dict to handle spaces in CSV headers
+                    row_clean = {k.strip(): v for k, v in row.items()}
+                    
+                    timestamp = int(row_clean["timestamp"].strip())
                     date_obj = datetime.datetime.fromtimestamp(timestamp)
                     date = int(time.mktime(date_obj.timetuple()))
                     
-                    dVperiodical = float(row["dVperiodical"].strip()) if row["dVperiodical"].strip() else 0
-                    dVcompelled = float(row["dVcompelled"].strip()) if row["dVcompelled"].strip() else 0
+                    dVperiodical = float(row_clean["dVperiodical"].strip()) if row_clean["dVperiodical"].strip() else 0
+                    dVcompelled = float(row_clean["dVcompelled"].strip()) if row_clean["dVcompelled"].strip() else 0
                     value = dVperiodical if dVperiodical else dVcompelled
                     
                     all_timestamps.append((date, date_obj, value))
@@ -204,10 +125,26 @@ def aggregate_data(tankCsv, start_ts, end_ts, graph_type):
     return aggregated
 
 
+# Call Append_CSV.py to process and update the CSV file
+try:
+    print("Processing CSV data with Append_CSV.py...")
+    result = subprocess.run(["python", "Append_CSV.py"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Error running Append_CSV.py: {result.stderr}")
+        sys.exit(1)
+    print(result.stdout)
+except Exception as e:
+    print(f"Error calling Append_CSV.py: {e}")
+    sys.exit(1)
+
 # Calculate volume and aggregate data
 try:
-    calculate_tank_volume(tankCsv, tank_config)
     aggregated_values = aggregate_data(tankCsv, start_ts, end_ts, selected_graph_type)
+    
+    # If no data in requested range, try to use all available data
+    if not aggregated_values:
+        print("Warning: No data in requested date range. Using all available data...")
+        aggregated_values = aggregate_data(tankCsv, 0, int(time.time()) + 86400*365*10, selected_graph_type)
     
     if not aggregated_values:
         print("Error: No data available for selected date range")
