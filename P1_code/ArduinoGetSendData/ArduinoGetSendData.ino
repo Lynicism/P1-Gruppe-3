@@ -75,7 +75,7 @@ void loop() {
     }  
   }
 
-  if(distance <=20){ // Hvis vandstanden er meget høj (afstand <= 20 cm)
+  if(distance <=15){ // Hvis vandstanden er meget høj (afstand <= 20 cm)
     digitalWrite(VENTIL_PIN, HIGH); // Åbner for ventilen
   }else{
     digitalWrite(VENTIL_PIN, LOW); // Lukker for ventilen
